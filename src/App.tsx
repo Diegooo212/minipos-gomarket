@@ -4,6 +4,7 @@ import { useAuthStore } from "./store/useAuthStore";
 import { useCajaStore } from "./store/useCajaStore";
 import { useStore } from "./store/useStore";
 import { getDB } from "./db/database";
+import { tienePermiso } from "./utils/permissions";
 import PinLogin from "./components/PinLogin";
 import TopBar from "./components/TopBar";
 import POS from "./pages/POS";
@@ -15,28 +16,29 @@ import Reportes from "./pages/Reportes";
 import CierreCaja from "./pages/CierreCaja";
 import Configuracion from "./pages/Configuracion";
 
+// Página por defecto según rol
+function paginaInicialPorRol(rol: string): string {
+  switch (rol) {
+    case "admin":      return "dashboard";
+    case "supervisor": return "dashboard";
+    case "cajero":     return "pos";
+    default:           return "pos";
+  }
+}
+
 export default function App() {
   const { usuario } = useAuthStore();
   const { setTurno } = useCajaStore();
-  const setPagina = useStore((s) => s.setPagina);
-  const paginaActual = useStore((s) => s.paginaActual);
+  const { paginaActual, setPagina } = useStore();
 
-  // Atajos de teclado globales
+  // Al hacer login → redirigir a la página correcta según rol
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (!usuario) return;
-      const mapa: Record<string, string> = {
-        F1: "pos", F2: "dashboard", F3: "inventario",
-        F5: "clientes", F6: "proveedores", F7: "reportes",
-        F8: "cierre_caja", F12: "configuracion",
-      };
-      if (mapa[e.key]) { e.preventDefault(); setPagina(mapa[e.key]); }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [usuario]);
+    if (!usuario) return;
+    const paginaInicial = paginaInicialPorRol(usuario.rol);
+    setPagina(paginaInicial);
+  }, [usuario?.id]); // Solo cuando cambia el usuario (no en cada render)
 
-  // Verificar si hay turno abierto al iniciar sesión
+  // Al hacer login → buscar turno abierto
   useEffect(() => {
     if (!usuario) return;
     (async () => {
@@ -46,12 +48,52 @@ export default function App() {
       );
       if (rows.length > 0) setTurno(rows[0]);
     })();
+  }, [usuario?.id]);
+
+  // Atajos de teclado globales — solo para páginas que el rol puede ver
+  useEffect(() => {
+    if (!usuario) return;
+    const handler = (e: KeyboardEvent) => {
+      const mapa: Record<string, { pagina: string; permiso: string }> = {
+        F1:  { pagina: "pos",          permiso: "hacerVenta" },
+        F2:  { pagina: "dashboard",    permiso: "verDashboard" },
+        F3:  { pagina: "inventario",   permiso: "editarProductos" },
+        F5:  { pagina: "clientes",     permiso: "hacerVenta" },
+        F6:  { pagina: "proveedores",  permiso: "editarProductos" },
+        F7:  { pagina: "reportes",     permiso: "verReportes" },
+        F8:  { pagina: "cierre_caja",  permiso: "abrirCaja" },
+        F12: { pagina: "configuracion",permiso: "gestionarUsuarios" },
+      };
+      const destino = mapa[e.key];
+      if (destino && tienePermiso(usuario.rol, destino.permiso)) {
+        e.preventDefault();
+        setPagina(destino.pagina);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   }, [usuario]);
+
+  // Guardia de página — si el usuario no tiene permiso para la página actual, redirige
+  useEffect(() => {
+    if (!usuario) return;
+    const permisosPorPagina: Record<string, string> = {
+      dashboard:     "verDashboard",
+      inventario:    "editarProductos",
+      proveedores:   "editarProductos",
+      reportes:      "verReportes",
+      configuracion: "gestionarUsuarios",
+    };
+    const permiso = permisosPorPagina[paginaActual];
+    if (permiso && !tienePermiso(usuario.rol, permiso)) {
+      setPagina(paginaInicialPorRol(usuario.rol));
+    }
+  }, [paginaActual, usuario]);
 
   if (!usuario) return (
     <>
       <Toaster position="top-center" toastOptions={{
-        style: { background: "#1a1a2e", color: "#fff", border: "1px solid rgba(255,255,255,0.1)", fontSize: 13 },
+        style: { background: "var(--bg-card)", color: "var(--text-primary)", border: "1px solid var(--border-default)", fontSize: 13 },
       }} />
       <PinLogin />
     </>
@@ -69,12 +111,12 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[#0f0f13] overflow-hidden">
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden", background: "var(--bg-base)" }}>
       <Toaster position="top-right" toastOptions={{
-        style: { background: "#1a1a2e", color: "#fff", border: "1px solid rgba(255,255,255,0.1)", fontSize: 13 },
+        style: { background: "var(--bg-card)", color: "var(--text-primary)", border: "1px solid var(--border-default)", fontSize: 13 },
       }} />
       <TopBar pagina={paginaActual} setPagina={setPagina} />
-      <div className="flex-1 overflow-hidden">
+      <div style={{ flex: 1, overflow: "hidden" }}>
         {paginas[paginaActual] ?? <POS />}
       </div>
     </div>

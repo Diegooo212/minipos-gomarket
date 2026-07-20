@@ -12,8 +12,11 @@ interface AuthStore {
 export const useAuthStore = create<AuthStore>((set) => ({
   usuario: null,
   turnoId: null,
+
   login: (usuario) => set({ usuario }),
+
   logout: () => set({ usuario: null, turnoId: null }),
+
   setTurnoId: (id) => set({ turnoId: id }),
 }));
 

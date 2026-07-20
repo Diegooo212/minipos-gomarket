@@ -4,11 +4,14 @@ interface ModalProps {
   abierto: boolean;
   onCerrar: () => void;
   titulo: string;
+  subtitulo?: string;
   children: React.ReactNode;
   ancho?: string;
 }
 
-export default function Modal({ abierto, onCerrar, titulo, children, ancho = "w-[480px]" }: ModalProps) {
+export default function Modal({
+  abierto, onCerrar, titulo, subtitulo, children, ancho = "360px"
+}: ModalProps) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onCerrar();
@@ -21,22 +24,32 @@ export default function Modal({ abierto, onCerrar, titulo, children, ancho = "w-
 
   return (
     <div
-      className="fixed inset-0 bg-black/75 flex items-center justify-center z-50"
-      onClick={(e) => e.target === e.currentTarget && onCerrar()}
+      className="modal-overlay"
+      onClick={e => e.target === e.currentTarget && onCerrar()}
     >
-      <div className={`bg-[#13131e] border border-[#2a2a3d] rounded-xl ${ancho} overflow-hidden shadow-2xl`}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#1e1e2e]">
-          <h2 className="text-[13px] font-semibold text-white">{titulo}</h2>
+      <div className="modal" style={{ width: ancho }}>
+        <div className="modal-header">
+          <div>
+            <div style={{ fontSize: "var(--text-base)", fontWeight: 600, color: "var(--text-primary)" }}>
+              {titulo}
+            </div>
+            {subtitulo && (
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 2 }}>
+                {subtitulo}
+              </div>
+            )}
+          </div>
           <button
             onClick={onCerrar}
-            className="text-[#3d3d5c] hover:text-white transition-colors"
+            className="btn btn-icon"
+            style={{ flexShrink: 0 }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
           </button>
         </div>
-        <div className="p-5">{children}</div>
+        <div className="modal-body">{children}</div>
       </div>
     </div>
   );

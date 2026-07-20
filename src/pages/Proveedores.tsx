@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { getDB } from "../db/database";
 import { Proveedor } from "../types";
 import Modal from "../components/Modal";
+import PageHeader from "../components/PageHeader";
 import toast from "react-hot-toast";
 
 const vacio: Proveedor = { nombre: "", contacto: "", telefono: "", email: "" };
@@ -53,52 +54,65 @@ export default function Proveedores() {
   );
 
   return (
-    <div className="p-4 flex flex-col gap-4 h-full overflow-hidden">
-      <div className="flex gap-3">
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+
+      <PageHeader titulo="Proveedores">
         <input
-          value={busqueda} onChange={e => setBusqueda(e.target.value)}
+          value={busqueda}
+          onChange={e => setBusqueda(e.target.value)}
           placeholder="Buscar proveedor..."
-          className="flex-1 bg-[#1a1a2e] border border-[#2a2a3d] rounded-lg px-4 py-2.5 text-white text-[13px] outline-none focus:border-[#3b5bdb] placeholder-[#3d3d5c]"
+          className="input"
+          style={{ width: 280 }}
         />
-        <button
-          onClick={() => { setForm(vacio); setEditando(null); setModal(true); }}
-          className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all"
-        >
+        <button onClick={() => { setForm(vacio); setEditando(null); setModal(true); }} className="btn btn-primary">
           + Nuevo proveedor
         </button>
+      </PageHeader>
+
+      <div style={{ flex: 1, overflow: "hidden", margin: "var(--space-4) var(--space-5) var(--space-5)" }}>
+        <div className="card" style={{ height: "100%", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          <div className="scroll-area" style={{ flex: 1 }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Empresa</th>
+                  <th>Contacto</th>
+                  <th>Teléfono</th>
+                  <th>Email</th>
+                  <th style={{ textAlign: "right" }}>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtrados.length === 0 && (
+                  <tr><td colSpan={5}><div className="empty-state">Sin proveedores registrados</div></td></tr>
+                )}
+                {filtrados.map(p => (
+                  <tr key={p.id}>
+                    <td style={{ fontWeight: 600 }}>{p.nombre}</td>
+                    <td style={{ color: "var(--text-secondary)" }}>{p.contacto || "—"}</td>
+                    <td style={{ color: "var(--text-secondary)" }}>{p.telefono || "—"}</td>
+                    <td style={{ color: "var(--text-secondary)" }}>{p.email || "—"}</td>
+                    <td>
+                      <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
+                        <button onClick={() => { setForm({ ...p }); setEditando(p.id!); setModal(true); }}
+                          className="btn btn-ghost btn-sm">Editar</button>
+                        <button onClick={() => eliminar(p.id!)} className="btn btn-danger btn-sm">Eliminar</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto bg-[#13131e] border border-[#2a2a3d] rounded-xl">
-        <table className="w-full text-[12px]">
-          <thead className="sticky top-0 bg-[#0f0f18] border-b border-[#1e1e2e]">
-            <tr>
-              {["Nombre","Contacto","Teléfono","Email","Acciones"].map(h => (
-                <th key={h} className="text-left px-4 py-3 text-[#4d4d6a] font-medium">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtrados.length === 0 && (
-              <tr><td colSpan={5} className="text-center py-8 text-[#3d3d5c]">Sin proveedores registrados</td></tr>
-            )}
-            {filtrados.map(p => (
-              <tr key={p.id} className="border-t border-[#1e1e2e] hover:bg-[#1a1a2e] transition-colors">
-                <td className="px-4 py-3 text-white font-medium">{p.nombre}</td>
-                <td className="px-4 py-3 text-[#6060a0]">{p.contacto || "—"}</td>
-                <td className="px-4 py-3 text-[#6060a0]">{p.telefono || "—"}</td>
-                <td className="px-4 py-3 text-[#6060a0]">{p.email || "—"}</td>
-                <td className="px-4 py-3 flex gap-2">
-                  <button onClick={() => { setForm({...p}); setEditando(p.id!); setModal(true); }} className="text-[11px] bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded transition-all">Editar</button>
-                  <button onClick={() => eliminar(p.id!)} className="text-[11px] bg-red-500/20 hover:bg-red-500/40 text-red-400 px-2 py-1 rounded transition-all">Eliminar</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <Modal abierto={modal} onCerrar={() => { setModal(false); setForm(vacio); }} titulo={editando ? "Editar proveedor" : "Nuevo proveedor"}>
-        <div className="flex flex-col gap-3">
+      <Modal
+        abierto={modal}
+        onCerrar={() => { setModal(false); setForm(vacio); }}
+        titulo={editando ? "Editar proveedor" : "Nuevo proveedor"}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
           {[
             { label: "Nombre empresa", key: "nombre", placeholder: "Distribuidora Central" },
             { label: "Contacto", key: "contacto", placeholder: "Juan Pérez" },
@@ -106,18 +120,20 @@ export default function Proveedores() {
             { label: "Email", key: "email", placeholder: "contacto@empresa.cl" },
           ].map(f => (
             <div key={f.key}>
-              <label className="text-[11px] text-[#4d4d6a] mb-1 block">{f.label}</label>
+              <label style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", display: "block", marginBottom: "var(--space-1)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                {f.label}
+              </label>
               <input
                 value={(form as any)[f.key]}
-                onChange={e => setForm({...form, [f.key]: e.target.value})}
+                onChange={e => setForm({ ...form, [f.key]: e.target.value })}
                 placeholder={f.placeholder}
-                className="w-full bg-[#0f0f18] border border-[#2a2a3d] rounded-lg px-3 py-2 text-white text-[13px] outline-none focus:border-[#3b5bdb]"
+                className="input"
               />
             </div>
           ))}
-          <div className="flex gap-2 justify-end mt-2">
-            <button onClick={() => setModal(false)} className="px-4 py-2 text-[12px] text-[#6060a0] border border-[#2a2a3d] rounded-lg hover:text-white transition-all">Cancelar</button>
-            <button onClick={guardar} className="px-4 py-2 text-[12px] bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-all">
+          <div className="modal-footer" style={{ padding: 0, paddingTop: "var(--space-4)", justifyContent: "flex-end" }}>
+            <button onClick={() => setModal(false)} className="btn btn-ghost">Cancelar</button>
+            <button onClick={guardar} className="btn btn-primary">
               {editando ? "Guardar" : "Agregar"}
             </button>
           </div>

@@ -3,6 +3,8 @@ import { getDB } from "../db/database";
 import { Cliente } from "../types";
 import { fmtCLP, fmtFecha } from "../utils/format";
 import Modal from "../components/Modal";
+import KpiCard from "../components/KpiCard";
+import PageHeader from "../components/PageHeader";
 import toast from "react-hot-toast";
 
 const vacio: Cliente = { nombre: "", telefono: "", rut: "", saldo_fiado: 0, puntos: 0 };
@@ -83,93 +85,118 @@ export default function Clientes() {
     c.rut.includes(busqueda)
   );
 
+  const totalFiado = clientes.reduce((a, c) => a + c.saldo_fiado, 0);
+  const conFiado = clientes.filter(c => c.saldo_fiado > 0).length;
+
   return (
-    <div className="p-4 flex flex-col gap-4 h-full overflow-hidden">
-      <div className="flex gap-3">
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+
+      <PageHeader titulo="Clientes">
         <input
-          value={busqueda} onChange={e => setBusqueda(e.target.value)}
+          value={busqueda}
+          onChange={e => setBusqueda(e.target.value)}
           placeholder="Buscar por nombre, RUT o teléfono..."
-          className="flex-1 bg-[#1a1a2e] border border-[#2a2a3d] rounded-lg px-4 py-2.5 text-white text-[13px] outline-none focus:border-[#3b5bdb] placeholder-[#3d3d5c]"
+          className="input"
+          style={{ width: 300 }}
         />
-        <button
-          onClick={() => { setForm(vacio); setEditando(null); setModal(true); }}
-          className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all"
-        >
+        <button onClick={() => { setForm(vacio); setEditando(null); setModal(true); }} className="btn btn-primary">
           + Nuevo cliente
         </button>
-      </div>
+      </PageHeader>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { label: "Total clientes", value: clientes.length, color: "text-blue-400" },
-          { label: "Con fiado", value: clientes.filter(c => c.saldo_fiado > 0).length, color: "text-red-400" },
-          { label: "Total fiado", value: fmtCLP(clientes.reduce((a, c) => a + c.saldo_fiado, 0)), color: "text-yellow-400" },
-        ].map(s => (
-          <div key={s.label} className="bg-[#1a1a2e] border border-[#2a2a3d] rounded-xl p-3">
-            <div className="text-[11px] text-[#4d4d6a] mb-1">{s.label}</div>
-            <div className={`text-[20px] font-bold ${s.color}`}>{s.value}</div>
-          </div>
-        ))}
+      {/* KPIs */}
+      <div style={{
+        display: "grid", gridTemplateColumns: "repeat(3,1fr)",
+        gap: "var(--space-3)", padding: "var(--space-4) var(--space-5)", flexShrink: 0,
+      }}>
+        <KpiCard label="Total clientes" value={clientes.length} />
+        <KpiCard label="Con fiado" value={conFiado} valueColor={conFiado > 0 ? "var(--warning)" : undefined} />
+        <KpiCard label="Total fiado" value={fmtCLP(totalFiado)} valueColor={totalFiado > 0 ? "var(--danger)" : undefined} />
       </div>
 
       {/* Tabla */}
-      <div className="flex-1 overflow-y-auto bg-[#13131e] border border-[#2a2a3d] rounded-xl">
-        <table className="w-full text-[12px]">
-          <thead className="sticky top-0 bg-[#0f0f18] border-b border-[#1e1e2e]">
-            <tr>
-              {["Nombre","RUT","Teléfono","Fiado","Puntos","Acciones"].map(h => (
-                <th key={h} className="text-left px-4 py-3 text-[#4d4d6a] font-medium">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtrados.length === 0 && (
-              <tr><td colSpan={6} className="text-center py-8 text-[#3d3d5c]">Sin clientes registrados</td></tr>
-            )}
-            {filtrados.map(c => (
-              <tr key={c.id} className="border-t border-[#1e1e2e] hover:bg-[#1a1a2e] transition-colors">
-                <td className="px-4 py-3 text-white font-medium">{c.nombre}</td>
-                <td className="px-4 py-3 text-[#6060a0] font-mono">{c.rut || "—"}</td>
-                <td className="px-4 py-3 text-[#6060a0]">{c.telefono || "—"}</td>
-                <td className="px-4 py-3">
-                  <span className={`font-bold ${c.saldo_fiado > 0 ? "text-red-400" : "text-[#3d3d5c]"}`}>
-                    {c.saldo_fiado > 0 ? fmtCLP(c.saldo_fiado) : "—"}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-[#6060a0]">{c.puntos}</td>
-                <td className="px-4 py-3 flex gap-2">
-                  <button onClick={() => abrirFiado(c)} className="text-[11px] bg-yellow-500/20 hover:bg-yellow-500/40 text-yellow-400 px-2 py-1 rounded transition-all">Fiado</button>
-                  <button onClick={() => { setForm({...c}); setEditando(c.id!); setModal(true); }} className="text-[11px] bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded transition-all">Editar</button>
-                  <button onClick={() => eliminar(c.id!)} className="text-[11px] bg-red-500/20 hover:bg-red-500/40 text-red-400 px-2 py-1 rounded transition-all">Eliminar</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div style={{ flex: 1, overflow: "hidden", margin: "0 var(--space-5) var(--space-5)" }}>
+        <div className="card" style={{ height: "100%", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          <div className="scroll-area" style={{ flex: 1 }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>RUT</th>
+                  <th>Teléfono</th>
+                  <th style={{ textAlign: "right" }}>Fiado</th>
+                  <th style={{ textAlign: "right" }}>Puntos</th>
+                  <th style={{ textAlign: "right" }}>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtrados.length === 0 && (
+                  <tr><td colSpan={6}><div className="empty-state">Sin clientes registrados</div></td></tr>
+                )}
+                {filtrados.map(c => (
+                  <tr key={c.id}>
+                    <td style={{ fontWeight: 600 }}>{c.nombre}</td>
+                    <td style={{ color: "var(--text-muted)", fontFamily: "monospace", fontSize: "var(--text-xs)" }}>
+                      {c.rut || "—"}
+                    </td>
+                    <td style={{ color: "var(--text-secondary)" }}>{c.telefono || "—"}</td>
+                    <td style={{ textAlign: "right" }}>
+                      {c.saldo_fiado > 0
+                        ? <span style={{ color: "var(--danger)", fontWeight: 700 }}>{fmtCLP(c.saldo_fiado)}</span>
+                        : <span style={{ color: "var(--text-disabled)" }}>—</span>
+                      }
+                    </td>
+                    <td style={{ textAlign: "right", color: "var(--text-muted)" }}>{c.puntos}</td>
+                    <td>
+                      <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
+                        <button onClick={() => abrirFiado(c)} className="btn btn-ghost btn-sm"
+                          style={{ color: "var(--warning)" }}>
+                          Fiado
+                        </button>
+                        <button onClick={() => { setForm({ ...c }); setEditando(c.id!); setModal(true); }}
+                          className="btn btn-ghost btn-sm">
+                          Editar
+                        </button>
+                        <button onClick={() => eliminar(c.id!)} className="btn btn-danger btn-sm">
+                          Eliminar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       {/* Modal nuevo/editar */}
-      <Modal abierto={modal} onCerrar={() => { setModal(false); setForm(vacio); }} titulo={editando ? "Editar cliente" : "Nuevo cliente"}>
-        <div className="flex flex-col gap-3">
+      <Modal
+        abierto={modal}
+        onCerrar={() => { setModal(false); setForm(vacio); }}
+        titulo={editando ? "Editar cliente" : "Nuevo cliente"}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
           {[
             { label: "Nombre completo", key: "nombre", placeholder: "Juan Pérez" },
             { label: "RUT", key: "rut", placeholder: "12.345.678-9" },
             { label: "Teléfono", key: "telefono", placeholder: "+56912345678" },
           ].map(f => (
             <div key={f.key}>
-              <label className="text-[11px] text-[#4d4d6a] mb-1 block">{f.label}</label>
+              <label style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", display: "block", marginBottom: "var(--space-1)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                {f.label}
+              </label>
               <input
                 value={(form as any)[f.key]}
-                onChange={e => setForm({...form, [f.key]: e.target.value})}
+                onChange={e => setForm({ ...form, [f.key]: e.target.value })}
                 placeholder={f.placeholder}
-                className="w-full bg-[#0f0f18] border border-[#2a2a3d] rounded-lg px-3 py-2 text-white text-[13px] outline-none focus:border-[#3b5bdb]"
+                className="input"
               />
             </div>
           ))}
-          <div className="flex gap-2 justify-end mt-2">
-            <button onClick={() => setModal(false)} className="px-4 py-2 text-[12px] text-[#6060a0] hover:text-white border border-[#2a2a3d] rounded-lg transition-all">Cancelar</button>
-            <button onClick={guardar} className="px-4 py-2 text-[12px] bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-all">
+          <div className="modal-footer" style={{ padding: 0, paddingTop: "var(--space-4)", justifyContent: "flex-end" }}>
+            <button onClick={() => setModal(false)} className="btn btn-ghost">Cancelar</button>
+            <button onClick={guardar} className="btn btn-primary">
               {editando ? "Guardar cambios" : "Agregar"}
             </button>
           </div>
@@ -177,42 +204,67 @@ export default function Clientes() {
       </Modal>
 
       {/* Modal fiado */}
-      <Modal abierto={modalFiado} onCerrar={() => setModalFiado(false)} titulo={`Fiado — ${clienteSeleccionado?.nombre}`}>
-        <div className="flex flex-col gap-4">
-          <div className="bg-[#0f0f18] border border-[#1e1e2e] rounded-lg p-3 flex justify-between items-center">
-            <span className="text-[12px] text-[#4d4d6a]">Saldo pendiente</span>
-            <span className="text-[20px] font-bold text-red-400">{fmtCLP(clienteSeleccionado?.saldo_fiado ?? 0)}</span>
+      <Modal
+        abierto={modalFiado}
+        onCerrar={() => setModalFiado(false)}
+        titulo="Fiado"
+        subtitulo={clienteSeleccionado?.nombre}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+          <div style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            background: "var(--bg-elevated)", border: "1px solid var(--border-default)",
+            borderRadius: "var(--radius-md)", padding: "var(--space-3) var(--space-4)",
+          }}>
+            <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase" }}>
+              Saldo pendiente
+            </span>
+            <span style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: "var(--danger)" }}>
+              {fmtCLP(clienteSeleccionado?.saldo_fiado ?? 0)}
+            </span>
           </div>
+
           <div>
-            <label className="text-[11px] text-[#4d4d6a] mb-1 block">Registrar pago</label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#4d4d6a] font-bold">$</span>
+            <label style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", display: "block", marginBottom: "var(--space-1)", fontWeight: 600, textTransform: "uppercase" }}>
+              Registrar pago
+            </label>
+            <div style={{ position: "relative" }}>
+              <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", fontWeight: 700 }}>$</span>
               <input
                 type="number"
                 value={montoFiado}
                 onChange={e => setMontoFiado(e.target.value)}
                 placeholder="0"
-                className="w-full bg-[#0f0f18] border border-[#2a2a3d] rounded-lg pl-8 pr-4 py-2.5 text-white text-[16px] font-bold outline-none focus:border-[#3b5bdb]"
+                className="input input-lg"
                 autoFocus
               />
             </div>
           </div>
+
           {historial.length > 0 && (
             <div>
-              <div className="text-[11px] text-[#4d4d6a] mb-2">Últimas compras</div>
-              <div className="space-y-1 max-h-32 overflow-y-auto">
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", marginBottom: "var(--space-2)" }}>
+                Últimas compras
+              </div>
+              <div style={{ maxHeight: 120, overflowY: "auto" }}>
                 {historial.map(v => (
-                  <div key={v.id} className="flex justify-between text-[11px] py-1 border-b border-[#1e1e2e]">
-                    <span className="text-[#6060a0]">{fmtFecha(v.fecha)}</span>
-                    <span className="text-white">{fmtCLP(v.total)}</span>
+                  <div key={v.id} style={{
+                    display: "flex", justifyContent: "space-between",
+                    padding: "var(--space-2) 0",
+                    borderBottom: "1px solid var(--border-subtle)",
+                    fontSize: "var(--text-xs)",
+                  }}>
+                    <span style={{ color: "var(--text-muted)" }}>{fmtFecha(v.fecha)}</span>
+                    <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{fmtCLP(v.total)}</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
-          <div className="flex gap-2 justify-end">
-            <button onClick={() => setModalFiado(false)} className="px-4 py-2 text-[12px] text-[#6060a0] border border-[#2a2a3d] rounded-lg hover:text-white transition-all">Cerrar</button>
-            <button onClick={registrarPagoFiado} className="px-4 py-2 text-[12px] bg-green-600 hover:bg-green-500 text-white rounded-lg font-medium transition-all">Registrar pago</button>
+
+          <div className="modal-footer" style={{ padding: 0, paddingTop: "var(--space-2)", justifyContent: "flex-end" }}>
+            <button onClick={() => setModalFiado(false)} className="btn btn-ghost">Cerrar</button>
+            <button onClick={registrarPagoFiado} className="btn btn-success">Registrar pago</button>
           </div>
         </div>
       </Modal>

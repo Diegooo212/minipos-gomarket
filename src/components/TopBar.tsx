@@ -2,18 +2,18 @@ import { useState, useEffect } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useStore } from "../store/useStore";
 import { useCajaStore } from "../store/useCajaStore";
-import OfflineIndicator from "./OfflineIndicator";
+import { useOffline } from "../hooks/useOffline";
 import { fmtCLP } from "../utils/format";
 
 const NAV = [
-  { id: "pos",          label: "Venta",       icon: "🛒", tecla: "F1", rol: ["admin","supervisor","cajero"] },
-  { id: "dashboard",    label: "Dashboard",   icon: "📊", tecla: "F2", rol: ["admin","supervisor"] },
-  { id: "inventario",   label: "Inventario",  icon: "📦", tecla: "F3", rol: ["admin","supervisor"] },
-  { id: "clientes",     label: "Clientes",    icon: "👥", tecla: "F5", rol: ["admin","supervisor","cajero"] },
-  { id: "proveedores",  label: "Proveedores", icon: "🚚", tecla: "F6", rol: ["admin","supervisor"] },
-  { id: "reportes",     label: "Reportes",    icon: "📈", tecla: "F7", rol: ["admin","supervisor"] },
-  { id: "cierre_caja",  label: "Caja",        icon: "💰", tecla: "F8", rol: ["admin","supervisor","cajero"] },
-  { id: "configuracion",label: "Config",      icon: "⚙️",  tecla: "F12",rol: ["admin"] },
+  { id: "pos",          label: "Venta",      tecla: "F1",  rol: ["admin","supervisor","cajero"] },
+  { id: "dashboard",    label: "Dashboard",  tecla: "F2",  rol: ["admin","supervisor"] },
+  { id: "inventario",   label: "Inventario", tecla: "F3",  rol: ["admin","supervisor"] },
+  { id: "clientes",     label: "Clientes",   tecla: "F5",  rol: ["admin","supervisor","cajero"] },
+  { id: "proveedores",  label: "Proveedores",tecla: "F6",  rol: ["admin","supervisor"] },
+  { id: "reportes",     label: "Reportes",   tecla: "F7",  rol: ["admin","supervisor"] },
+  { id: "cierre_caja",  label: "Caja",       tecla: "F8",  rol: ["admin","supervisor","cajero"] },
+  { id: "configuracion",label: "Config",     tecla: "F12", rol: ["admin"] },
 ];
 
 interface TopBarProps {
@@ -23,8 +23,9 @@ interface TopBarProps {
 
 export default function TopBar({ pagina, setPagina }: TopBarProps) {
   const { usuario, logout } = useAuthStore();
-  const carrito = useStore((s) => s.carrito);
+  const tickets = useStore(s => s.tickets);
   const { totalDelTurno, ventasDelTurno } = useCajaStore();
+  const offline = useOffline();
   const [hora, setHora] = useState(new Date());
 
   useEffect(() => {
@@ -32,41 +33,38 @@ export default function TopBar({ pagina, setPagina }: TopBarProps) {
     return () => clearInterval(t);
   }, []);
 
-  const navFiltrado = NAV.filter((n) =>
-    usuario?.rol && n.rol.includes(usuario.rol)
-  );
-
-  const totalCarrito = carrito.reduce((a, i) => a + i.cantidad, 0);
+  const navFiltrado = NAV.filter(n => usuario?.rol && n.rol.includes(usuario.rol));
+  const totalCarrito = tickets.find(t => t.id)?.items.reduce((a, i) => a + i.cantidad, 0) ?? 0;
 
   return (
-    <div className="flex items-center gap-2 px-3 h-11 bg-[#0d0d16] border-b border-[#1a1a2e] shrink-0">
+    <header className="topbar">
+
       {/* Logo */}
-      <div className="flex items-center gap-2 mr-1 shrink-0">
-        <span className="text-base">🏪</span>
-        <span className="text-white font-semibold text-[12px]">MiniPOS</span>
-      </div>
+      <div className="topbar-logo">MiniPOS</div>
 
-      <div className="w-px h-4 bg-[#1e1e2e] mx-1" />
+      {/* Separador */}
+      <div style={{ width: 1, height: 20, background: "var(--border-default)", flexShrink: 0 }} />
 
-      {/* Nav */}
-      <nav className="flex gap-0.5 flex-1 overflow-hidden">
-        {navFiltrado.map((n) => (
+      {/* Navegación */}
+      <nav style={{ display: "flex", gap: 2, flex: 1, overflow: "hidden" }}>
+        {navFiltrado.map(n => (
           <button
             key={n.id}
             onClick={() => setPagina(n.id)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all shrink-0 ${
-              pagina === n.id
-                ? "bg-[#1e3a5f] text-blue-300"
-                : "text-[#4d4d6a] hover:text-white hover:bg-[#1a1a2e]"
-            }`}
+            className={`nav-item${pagina === n.id ? " active" : ""}`}
           >
-            <span className="text-[13px]">{n.icon}</span>
             {n.label}
-            <span className={`font-mono text-[9px] px-1 rounded ${
-              pagina === n.id ? "bg-blue-500/30 text-blue-300" : "bg-[#1e1e2e] text-[#3d3d5c]"
-            }`}>{n.tecla}</span>
+            <span className="kbd">{n.tecla}</span>
             {n.id === "pos" && totalCarrito > 0 && (
-              <span className="bg-green-500 text-white text-[9px] rounded-full px-1.5 leading-none py-0.5">
+              <span style={{
+                background: "var(--success)",
+                color: "#fff",
+                fontSize: 10,
+                fontWeight: 700,
+                borderRadius: 10,
+                padding: "1px 6px",
+                lineHeight: 1.4,
+              }}>
                 {totalCarrito}
               </span>
             )}
@@ -75,28 +73,62 @@ export default function TopBar({ pagina, setPagina }: TopBarProps) {
       </nav>
 
       {/* Derecha */}
-      <div className="flex items-center gap-3 ml-auto shrink-0">
-        <OfflineIndicator />
-        <div className="w-px h-4 bg-[#1e1e2e]" />
-        <div className="text-[11px] text-[#4d4d6a]">
-          Turno: <span className="text-[#8080a0]">{fmtCLP(totalDelTurno)}</span>
-          <span className="ml-1 text-[#3d3d5c]">({ventasDelTurno} ventas)</span>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)", flexShrink: 0 }}>
+
+        {/* Estado conexión */}
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+          <div style={{
+            width: 6, height: 6, borderRadius: "50%",
+            background: offline ? "var(--warning)" : "var(--success)",
+            flexShrink: 0,
+          }} />
+          <span style={{ fontSize: "var(--text-xs)", color: offline ? "var(--warning)" : "var(--text-muted)" }}>
+            {offline ? "Sin conexión" : "En línea"}
+          </span>
         </div>
-        <div className="w-px h-4 bg-[#1e1e2e]" />
-        <div className="text-[11px] text-[#6060a0]">
+
+        <div style={{ width: 1, height: 16, background: "var(--border-default)" }} />
+
+        {/* Turno */}
+        <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+          Turno{" "}
+          <span style={{ color: "var(--success)", fontWeight: 600 }}>
+            {fmtCLP(totalDelTurno)}
+          </span>
+          <span style={{ color: "var(--text-disabled)", marginLeft: 4 }}>
+            {ventasDelTurno} vta{ventasDelTurno !== 1 ? "s" : ""}
+          </span>
+        </div>
+
+        <div style={{ width: 1, height: 16, background: "var(--border-default)" }} />
+
+        {/* Reloj */}
+        <span style={{
+          fontSize: "var(--text-xs)",
+          color: "var(--text-muted)",
+          fontVariantNumeric: "tabular-nums",
+          whiteSpace: "nowrap",
+        }}>
           {hora.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-        </div>
-        <div className="w-px h-4 bg-[#1e1e2e]" />
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-[#6060a0]">👤 {usuario?.nombre}</span>
+        </span>
+
+        <div style={{ width: 1, height: 16, background: "var(--border-default)" }} />
+
+        {/* Usuario */}
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+          <span style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+            {usuario?.nombre}
+          </span>
+          <span className={`badge badge-${usuario?.rol}`}>{usuario?.rol}</span>
           <button
             onClick={logout}
-            className="text-[10px] text-[#3d3d5c] hover:text-red-400 transition-colors px-2 py-1 rounded border border-[#1e1e2e] hover:border-red-500/30"
+            className="btn btn-ghost btn-sm"
+            style={{ color: "var(--text-muted)" }}
           >
             Salir
           </button>
         </div>
       </div>
-    </div>
+    </header>
   );
 }

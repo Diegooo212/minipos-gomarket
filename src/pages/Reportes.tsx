@@ -1,16 +1,31 @@
 import { useState, useEffect } from "react";
 import { getDB } from "../db/database";
-import { fmtCLP, fmtFechaSolo } from "../utils/format";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
+import { fmtCLP } from "../utils/format";
+import KpiCard from "../components/KpiCard";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, PieChart, Pie, Cell
+} from "recharts";
 
-const COLORES = ["#3b82f6","#22c55e","#f59e0b","#ef4444","#8b5cf6","#06b6d4"];
+const PERIODOS = [
+  { v: "7",  l: "7 días" },
+  { v: "30", l: "30 días" },
+  { v: "90", l: "90 días" },
+];
+
+const METODO_COLORES: Record<string, string> = {
+  efectivo:      "var(--success)",
+  debito:        "var(--accent)",
+  credito:       "#a78bfa",
+  transferencia: "var(--info)",
+};
 
 export default function Reportes() {
+  const [periodo, setPeriodo] = useState<"7"|"30"|"90">("7");
   const [ventasDiarias, setVentasDiarias] = useState<any[]>([]);
   const [topProductos, setTopProductos] = useState<any[]>([]);
   const [ventasPorMetodo, setVentasPorMetodo] = useState<any[]>([]);
   const [resumen, setResumen] = useState({ total: 0, cantidad: 0, ticket: 0, iva: 0 });
-  const [periodo, setPeriodo] = useState<"7" | "30" | "90">("7");
 
   useEffect(() => { cargar(); }, [periodo]);
 
@@ -23,7 +38,7 @@ export default function Reportes() {
       GROUP BY date(fecha) ORDER BY dia
     `);
     setVentasDiarias(diarias.map(r => ({
-      dia: new Date(r.dia).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"}),
+      dia: new Date(r.dia).toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit" }),
       total: Math.round(r.total),
       cantidad: r.cantidad,
     })));
@@ -42,7 +57,11 @@ export default function Reportes() {
       FROM ventas WHERE estado='completada' AND fecha >= date('now','-${periodo} days')
       GROUP BY metodo_pago
     `);
-    setVentasPorMetodo(metodos.map(m => ({ name: m.metodo_pago, value: Math.round(m.total) })));
+    setVentasPorMetodo(metodos.map(m => ({
+      name: m.metodo_pago,
+      value: Math.round(m.total),
+      cantidad: m.cantidad,
+    })));
 
     const res = await db.select<any[]>(`
       SELECT COUNT(*) as cantidad, COALESCE(SUM(total),0) as total, COALESCE(SUM(iva),0) as iva
@@ -57,74 +76,131 @@ export default function Reportes() {
     });
   }
 
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div style={{
+        background: "var(--bg-overlay)", border: "1px solid var(--border-default)",
+        borderRadius: "var(--radius-md)", padding: "var(--space-3) var(--space-4)",
+        fontSize: "var(--text-xs)",
+      }}>
+        <div style={{ color: "var(--text-muted)", marginBottom: 4 }}>{label}</div>
+        <div style={{ color: "var(--success)", fontWeight: 700, fontSize: "var(--text-sm)" }}>
+          {fmtCLP(payload[0].value)}
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="p-4 flex flex-col gap-4 h-full overflow-y-auto">
-      {/* Periodo selector */}
-      <div className="flex items-center gap-2">
-        <span className="text-[12px] text-[#4d4d6a]">Período:</span>
-        {[{ v:"7", l:"7 días" },{ v:"30", l:"30 días" },{ v:"90", l:"90 días" }].map(p => (
-          <button
-            key={p.v}
-            onClick={() => setPeriodo(p.v as any)}
-            className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all ${
-              periodo === p.v ? "bg-blue-600 text-white" : "bg-[#1a1a2e] text-[#6060a0] hover:text-white border border-[#2a2a3d]"
-            }`}
-          >{p.l}</button>
-        ))}
+    <div style={{
+      height: "100%", overflowY: "auto",
+      padding: "var(--space-5)",
+      display: "flex", flexDirection: "column", gap: "var(--space-4)",
+    }}>
+
+      {/* Selector de período */}
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+        <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          Período
+        </span>
+        <div style={{ display: "flex", gap: "var(--space-1)", background: "var(--bg-card)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", padding: 3 }}>
+          {PERIODOS.map(p => (
+            <button
+              key={p.v}
+              onClick={() => setPeriodo(p.v as any)}
+              style={{
+                padding: "var(--space-1) var(--space-3)",
+                borderRadius: "var(--radius-sm)",
+                border: "none",
+                fontSize: "var(--text-xs)",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.15s",
+                background: periodo === p.v ? "var(--accent)" : "transparent",
+                color: periodo === p.v ? "#fff" : "var(--text-muted)",
+              }}
+            >
+              {p.l}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-4 gap-3">
-        {[
-          { label: "Total ventas", value: fmtCLP(resumen.total), color: "text-green-400" },
-          { label: "N° transacciones", value: resumen.cantidad.toString(), color: "text-blue-400" },
-          { label: "Ticket promedio", value: fmtCLP(resumen.ticket), color: "text-purple-400" },
-          { label: "IVA recaudado", value: fmtCLP(resumen.iva), color: "text-yellow-400" },
-        ].map(s => (
-          <div key={s.label} className="bg-[#1a1a2e] border border-[#2a2a3d] rounded-xl p-4">
-            <div className="text-[11px] text-[#4d4d6a] mb-1">{s.label}</div>
-            <div className={`text-[20px] font-bold ${s.color}`}>{s.value}</div>
-          </div>
-        ))}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "var(--space-3)" }}>
+        <KpiCard label="Total ventas" value={fmtCLP(resumen.total)} valueColor="var(--success)" />
+        <KpiCard label="Transacciones" value={resumen.cantidad} />
+        <KpiCard label="Ticket promedio" value={fmtCLP(resumen.ticket)} />
+        <KpiCard label="IVA recaudado" value={fmtCLP(resumen.iva)} valueColor="var(--text-secondary)" />
       </div>
 
       {/* Gráficos */}
-      <div className="grid grid-cols-2 gap-4">
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+
         {/* Ventas diarias */}
-        <div className="bg-[#13131e] border border-[#2a2a3d] rounded-xl p-4">
-          <div className="text-[13px] font-semibold text-white mb-4">Ventas diarias</div>
+        <div className="card" style={{ padding: "var(--space-5)" }}>
+          <div style={{
+            fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-muted)",
+            textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "var(--space-4)"
+          }}>
+            Ventas diarias
+          </div>
           {ventasDiarias.length === 0 ? (
-            <div className="text-center text-[#3d3d5c] text-[12px] py-8">Sin datos en este período</div>
+            <div className="empty-state" style={{ padding: "var(--space-8)" }}>Sin datos en este período</div>
           ) : (
             <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={ventasDiarias}>
-                <XAxis dataKey="dia" tick={{ fill:"#6b7280", fontSize:10 }} axisLine={false} tickLine={false}/>
-                <YAxis tick={{ fill:"#6b7280", fontSize:10 }} axisLine={false} tickLine={false} tickFormatter={v => "$"+v.toLocaleString("es-CL")}/>
-                <Tooltip contentStyle={{ background:"#13131f", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, fontSize:12 }} formatter={(v:any) => [fmtCLP(v),"Total"]}/>
-                <Bar dataKey="total" fill="#3b82f6" radius={[4,4,0,0]}/>
+              <BarChart data={ventasDiarias} barCategoryGap="35%">
+                <XAxis dataKey="dia" tick={{ fill: "var(--text-muted)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "var(--text-muted)", fontSize: 10 }} axisLine={false} tickLine={false}
+                  tickFormatter={v => "$" + (v / 1000).toFixed(0) + "k"} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: "var(--bg-elevated)" }} />
+                <Bar dataKey="total" fill="var(--accent)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
         </div>
 
-        {/* Métodos de pago */}
-        <div className="bg-[#13131e] border border-[#2a2a3d] rounded-xl p-4">
-          <div className="text-[13px] font-semibold text-white mb-4">Por método de pago</div>
+        {/* Por método de pago */}
+        <div className="card" style={{ padding: "var(--space-5)" }}>
+          <div style={{
+            fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-muted)",
+            textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "var(--space-4)"
+          }}>
+            Por método de pago
+          </div>
           {ventasPorMetodo.length === 0 ? (
-            <div className="text-center text-[#3d3d5c] text-[12px] py-8">Sin datos</div>
+            <div className="empty-state" style={{ padding: "var(--space-8)" }}>Sin datos</div>
           ) : (
-            <div className="flex items-center gap-4">
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-6)" }}>
               <PieChart width={140} height={140}>
-                <Pie data={ventasPorMetodo} cx={70} cy={70} innerRadius={40} outerRadius={65} dataKey="value" paddingAngle={3}>
-                  {ventasPorMetodo.map((_, i) => <Cell key={i} fill={COLORES[i % COLORES.length]}/>)}
+                <Pie
+                  data={ventasPorMetodo}
+                  cx={70} cy={70}
+                  innerRadius={42} outerRadius={65}
+                  dataKey="value" paddingAngle={3}
+                >
+                  {ventasPorMetodo.map((m) => (
+                    <Cell key={m.name} fill={METODO_COLORES[m.name] ?? "var(--text-muted)"} />
+                  ))}
                 </Pie>
               </PieChart>
-              <div className="flex flex-col gap-2">
-                {ventasPorMetodo.map((m, i) => (
-                  <div key={m.name} className="flex items-center gap-2 text-[12px]">
-                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: COLORES[i % COLORES.length] }}/>
-                    <span className="text-[#8080a0] capitalize">{m.name}</span>
-                    <span className="text-white font-medium ml-auto">{fmtCLP(m.value)}</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", flex: 1 }}>
+                {ventasPorMetodo.map(m => (
+                  <div key={m.name} style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                    <div style={{
+                      width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+                      background: METODO_COLORES[m.name] ?? "var(--text-muted)",
+                    }} />
+                    <span style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", textTransform: "capitalize", flex: 1 }}>
+                      {m.name}
+                    </span>
+                    <span style={{ fontSize: "var(--text-xs)", color: "var(--text-primary)", fontWeight: 600 }}>
+                      {fmtCLP(m.value)}
+                    </span>
+                    <span style={{ fontSize: "var(--text-xs)", color: "var(--text-disabled)" }}>
+                      {m.cantidad} vtas
+                    </span>
                   </div>
                 ))}
               </div>
@@ -134,25 +210,46 @@ export default function Reportes() {
       </div>
 
       {/* Top productos */}
-      <div className="bg-[#13131e] border border-[#2a2a3d] rounded-xl p-4">
-        <div className="text-[13px] font-semibold text-white mb-4">Productos más vendidos</div>
+      <div className="card" style={{ padding: "var(--space-5)" }}>
+        <div style={{
+          fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-muted)",
+          textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "var(--space-4)"
+        }}>
+          Productos más vendidos
+        </div>
         {topProductos.length === 0 ? (
-          <div className="text-center text-[#3d3d5c] text-[12px] py-4">Sin datos</div>
+          <div className="empty-state">Sin datos en este período</div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
-            {topProductos.map((p, i) => (
-              <div key={p.nombre} className="flex items-center gap-3">
-                <span className="text-[11px] text-[#3d3d5c] w-4">{i+1}</span>
-                <div className="flex-1">
-                  <div className="text-[12px] text-white mb-1 truncate">{p.nombre}</div>
-                  <div className="h-1.5 bg-[#1e1e2e] rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500 rounded-full" style={{ width:`${(p.cantidad/topProductos[0].cantidad)*100}%` }}/>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4) var(--space-8)" }}>
+            {topProductos.map((p, i) => {
+              const pct = Math.round((p.cantidad / topProductos[0].cantidad) * 100);
+              return (
+                <div key={p.nombre}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "var(--space-1)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                      <span style={{ fontSize: "var(--text-xs)", color: "var(--text-disabled)", fontWeight: 700, width: 16 }}>
+                        {i + 1}
+                      </span>
+                      <span style={{ fontSize: "var(--text-sm)", color: "var(--text-primary)", fontWeight: 500 }}>
+                        {p.nombre}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", gap: "var(--space-3)" }}>
+                      <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>{p.cantidad} uds</span>
+                      <span style={{ fontSize: "var(--text-xs)", color: "var(--success)", fontWeight: 600, width: 64, textAlign: "right" }}>
+                        {fmtCLP(p.total)}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ height: 3, background: "var(--bg-elevated)", borderRadius: 2 }}>
+                    <div style={{
+                      height: "100%", width: `${pct}%`,
+                      background: "var(--accent)", borderRadius: 2,
+                    }} />
                   </div>
                 </div>
-                <span className="text-[11px] text-[#6060a0] shrink-0">{p.cantidad} uds</span>
-                <span className="text-[11px] text-green-400 shrink-0 w-16 text-right">{fmtCLP(p.total)}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
